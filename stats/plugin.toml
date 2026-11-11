@@ -1,0 +1,163 @@
+id = "woxQAQ/stats"
+name = "Stats"
+version = "0.1.0"
+plugin_api = 32
+author = "woxQAQ"
+license = "MIT"
+icon = "activity"
+description = "Configurable resource widgets, filled charts and Linux process details."
+tags = ["system", "monitor", "stats"]
+
+[[setting]]
+key = "interval_seconds"
+type = "int"
+label_key = "settings.interval"
+default = 2
+min = 1
+max = 10
+
+[[setting]]
+key = "history_seconds"
+type = "int"
+label_key = "settings.history"
+default = 120
+min = 30
+max = 600
+
+[[setting]]
+key = "smooth_graphs"
+type = "bool"
+label_key = "settings.smooth_graphs"
+default = true
+
+[[setting]]
+key = "disk_device"
+type = "string"
+label_key = "settings.disk_device"
+description_key = "settings.disk_device_help"
+default = ""
+
+[[setting]]
+key = "disk_path"
+type = "string"
+label_key = "settings.disk_path"
+default = "/"
+
+[[setting]]
+key = "interface"
+type = "string"
+label_key = "settings.interface"
+description_key = "settings.interface_help"
+default = ""
+
+[[setting]]
+key = "additional_interfaces"
+type = "string_list"
+label_key = "settings.additional_interfaces"
+description_key = "settings.additional_interfaces_help"
+default = []
+
+[[setting]]
+key = "show_ipv6"
+type = "bool"
+label_key = "settings.show_ipv6"
+default = false
+
+[[setting]]
+key = "public_ip_enabled"
+type = "bool"
+label_key = "settings.public_ip_enabled"
+description_key = "settings.public_ip_help"
+default = true
+
+[[setting]]
+key = "public_ip_endpoint"
+type = "string"
+label_key = "settings.public_ip_endpoint"
+default = "https://api.ipify.org"
+advanced = true
+
+[[setting]]
+key = "collector_command"
+type = "string"
+label_key = "settings.collector"
+default = "bin/noctalia-stats-collector"
+advanced = true
+
+[[service]]
+id = "sampler"
+entry = "service.luau"
+
+[[widget]]
+id = "cpu"
+entry = "cpu.luau"
+  [widget.actions]
+  right = "settings-open-widget"
+  [[widget.setting]]
+  key = "display"
+  type = "select"
+  label_key = "settings.display"
+  default = "both"
+  options = [{ value = "value", label_key = "display.value" }, { value = "mini", label_key = "display.mini" }, { value = "graph", label_key = "display.graph" }, { value = "line", label_key = "display.line" }, { value = "both", label_key = "display.both" }, { value = "bars", label_key = "display.bars" }, { value = "ring", label_key = "display.ring" }, { value = "pie", label_key = "display.pie" }, { value = "gauge", label_key = "display.gauge" }]
+
+[[widget]]
+id = "memory"
+entry = "memory.luau"
+  [widget.actions]
+  right = "settings-open-widget"
+  [[widget.setting]]
+  key = "display"
+  type = "select"
+  label_key = "settings.display"
+  default = "both"
+  options = [{ value = "value", label_key = "display.value" }, { value = "mini", label_key = "display.mini" }, { value = "graph", label_key = "display.graph" }, { value = "line", label_key = "display.line" }, { value = "both", label_key = "display.both" }, { value = "bars", label_key = "display.bars" }, { value = "ring", label_key = "display.ring" }, { value = "pie", label_key = "display.pie" }, { value = "memory", label_key = "display.memory" }]
+
+[[widget]]
+id = "disk"
+entry = "disk.luau"
+  [widget.actions]
+  right = "settings-open-widget"
+  [[widget.setting]]
+  key = "capacity_display"
+  type = "select"
+  label_key = "settings.display"
+  default = "both"
+  visible_when = { key = "disk_metric", values = ["free"] }
+  options = [{ value = "value", label_key = "display.value" }, { value = "mini", label_key = "display.mini" }, { value = "both", label_key = "capacity.both" }, { value = "bars", label_key = "display.bars" }, { value = "ring", label_key = "display.ring" }, { value = "pie", label_key = "display.pie" }]
+  [[widget.setting]]
+  key = "display"
+  type = "select"
+  label_key = "settings.display"
+  default = "both"
+  visible_when = { key = "disk_metric", values = ["io"] }
+  options = [{ value = "value", label_key = "display.value" }, { value = "mini", label_key = "display.mini" }, { value = "graph", label_key = "display.graph" }, { value = "line", label_key = "display.line" }, { value = "both", label_key = "display.both" }, { value = "bars", label_key = "display.bars" }]
+  [[widget.setting]]
+  key = "disk_metric"
+  type = "select"
+  label_key = "settings.disk_metric"
+  default = "free"
+  options = [{ value = "free", label_key = "disk_metric.free" }, { value = "io", label_key = "disk_metric.io" }]
+
+[[widget]]
+id = "network"
+entry = "network.luau"
+  [widget.actions]
+  right = "settings-open-widget"
+  [[widget.setting]]
+  key = "display"
+  type = "select"
+  label_key = "settings.display"
+  default = "speed"
+  options = [{ value = "value", label_key = "display.value" }, { value = "mini", label_key = "display.mini" }, { value = "graph", label_key = "display.graph" }, { value = "line", label_key = "display.line" }, { value = "both", label_key = "display.both" }, { value = "bars", label_key = "display.bars" }, { value = "speed", label_key = "display.speed" }]
+  [[widget.setting]]
+  key = "network_layout"
+  type = "select"
+  label_key = "settings.network_layout"
+  default = "stacked"
+  options = [{ value = "stacked", label_key = "layout.stacked" }, { value = "inline", label_key = "layout.inline" }]
+
+[[panel]]
+id = "details"
+entry = "panel.luau"
+width = 380
+height = 720

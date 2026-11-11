@@ -1,0 +1,18 @@
+[package]
+name = "noctalia-stats-collector"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "noctalia-stats-collector"
+path = "collector/src/main.rs"
+
+[dependencies]
+libc = "=0.2.186"
+serde_json = "=1.0.154"
+
+[profile.release]
+lto = "thin"
+strip = true

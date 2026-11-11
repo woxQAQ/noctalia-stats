@@ -1,0 +1,9 @@
+[project]
+name = "noctalia-stats"
+version = "0.1.0"
+description = "Native Noctalia resource widgets and Linux system details"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false
