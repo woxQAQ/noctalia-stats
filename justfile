@@ -14,11 +14,11 @@ check: collector
 
 format:
     cargo fmt
-    stylua stats tests/scenarios.luau
+    stylua stats tests
 
 format-check:
     cargo fmt --check
-    stylua --check stats tests/scenarios.luau
+    stylua --check stats tests
 
 reload: collector
     noctalia plugins lint stats

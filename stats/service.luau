@@ -1,6 +1,7 @@
 --!nonstrict
 local proc = require("./lib/proc.luau")
 local collector = require("./lib/collector.luau")
+local magpie = require("./lib/magpie.luau")
 local previous = {}
 local processBaseline = nil
 local processBusy = false
@@ -236,6 +237,7 @@ local function publish(files, host)
 end
 
 function update()
+	magpie.refresh()
 	if sampling then
 		return
 	end
@@ -287,6 +289,10 @@ function update()
 end
 
 function onIpc(event)
+	if event == "magpie-refresh" then
+		magpie.refresh(true)
+		return
+	end
 	if event ~= "diagnose" then
 		return
 	end
@@ -312,11 +318,17 @@ function onIpc(event)
 			snapshotAgeMs = snapshot and noctalia.nowMs() - snapshot.at,
 			processStatus = processes and processes.status,
 			processCount = processes and processes.count,
+			magpie = magpie.status(),
 			processAgeMs = processes and processes.at and noctalia.nowMs() - processes.at,
 		}, true)
 	)
 end
 
+noctalia.state.watch("magpie_provider_request", magpie.selectProvider)
+noctalia.state.watch("magpie_window_request", magpie.selectWindow)
+noctalia.state.watch("magpie_refresh", function()
+	magpie.refresh(true)
+end)
 noctalia.setUpdateInterval(interval * 1000)
 noctalia.state.set("snapshot", { status = "warming_up", at = noctalia.nowMs() })
 noctalia.state.set("processes", { status = "inactive" })

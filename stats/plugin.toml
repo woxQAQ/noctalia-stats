@@ -1,11 +1,11 @@
 id = "woxQAQ/stats"
 name = "Stats"
 version = "0.1.0"
-plugin_api = 32
+plugin_api = 42
 author = "woxQAQ"
 license = "MIT"
 icon = "activity"
-description = "Configurable resource widgets, filled charts and Linux process details."
+description = "Resource monitoring and Magpie model usage statistics."
 tags = ["system", "monitor", "stats"]
 
 [[setting]]
@@ -84,6 +84,42 @@ label_key = "settings.collector"
 default = "bin/noctalia-stats-collector"
 advanced = true
 
+[[setting]]
+key = "magpie_enabled"
+type = "bool"
+label_key = "settings.magpie_enabled"
+default = true
+
+[[setting]]
+key = "magpie_metrics_endpoint"
+type = "string"
+label_key = "settings.magpie_endpoint"
+description_key = "settings.magpie_endpoint_help"
+default = "http://localhost:8428"
+
+[[setting]]
+key = "magpie_service_name"
+type = "string"
+label_key = "settings.magpie_service"
+default = "magpie"
+advanced = true
+
+[[setting]]
+key = "magpie_window"
+type = "select"
+label_key = "settings.magpie_window"
+default = "today"
+options = [{ value = "today", label_key = "magpie.window.today" }, { value = "7d", label_key = "magpie.window.7d" }, { value = "30d", label_key = "magpie.window.30d" }, { value = "1h", label_key = "magpie.window.1h" }, { value = "6h", label_key = "magpie.window.6h" }, { value = "24h", label_key = "magpie.window.24h" }]
+
+[[setting]]
+key = "magpie_poll_seconds"
+type = "int"
+label_key = "settings.magpie_poll"
+default = 10
+min = 5
+max = 120
+advanced = true
+
 [[service]]
 id = "sampler"
 entry = "service.luau"
@@ -156,8 +192,26 @@ entry = "network.luau"
   default = "stacked"
   options = [{ value = "stacked", label_key = "layout.stacked" }, { value = "inline", label_key = "layout.inline" }]
 
+[[widget]]
+id = "magpie"
+entry = "magpie.luau"
+  [widget.actions]
+  right = "settings-open-widget"
+  [[widget.setting]]
+  key = "display"
+  type = "select"
+  label_key = "settings.display"
+  default = "tokens"
+  options = [{ value = "tokens", label_key = "magpie.tokens" }, { value = "value", label_key = "display.value" }, { value = "mini", label_key = "display.mini" }]
+
 [[panel]]
 id = "details"
 entry = "panel.luau"
 width = 380
 height = 720
+
+[[panel]]
+id = "magpie-details"
+entry = "magpie_panel.luau"
+width = 380
+height = 480

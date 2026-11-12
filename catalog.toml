@@ -2,9 +2,9 @@
 id = "woxQAQ/stats"
 name = "Stats"
 version = "0.1.0"
-plugin_api = 32
+plugin_api = 42
 author = "woxQAQ"
 license = "MIT"
 icon = "activity"
-description = "Configurable resource widgets, filled charts and Linux process details."
+description = "Resource monitoring and Magpie model usage statistics."
 tags = ["system", "monitor", "stats"]

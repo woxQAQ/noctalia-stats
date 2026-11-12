@@ -27,7 +27,7 @@ class PluginScenarios(unittest.TestCase):
             for entry in manifest[kind]:
                 self.assertTrue((PLUGIN / entry["entry"]).is_file())
 
-    def test_complete_service_and_ui_lifecycle(self):
+    def run_luau_scenario(self, scenario_name):
         luau = shutil.which("luau")
         self.assertIsNotNone(luau, "Run checks inside nix develop; Luau is required")
         translations = json.loads((PLUGIN / "translations/en.json").read_text())
@@ -45,13 +45,19 @@ class PluginScenarios(unittest.TestCase):
             parts.append(f"SOURCES[{name}] = [====[{path.read_text()}]====]")
         for key, value in translations.items():
             parts.append(f"TRANSLATIONS[{json.dumps(key)}] = {json.dumps(value, ensure_ascii=False)}")
-        parts.append((ROOT / "tests/scenarios.luau").read_text())
+        parts.append((ROOT / "tests" / scenario_name).read_text())
         with tempfile.TemporaryDirectory() as directory:
             script = Path(directory) / "scenario.luau"
             script.write_text("\n".join(parts))
             result = subprocess.run([luau, str(script)], capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("PASS:", result.stdout)
+
+    def test_complete_service_and_ui_lifecycle(self):
+        self.run_luau_scenario("scenarios.luau")
+
+    def test_magpie_usage_consumer_and_ui(self):
+        self.run_luau_scenario("magpie_scenarios.luau")
 
     def test_process_collector_protocol_with_procfs_fixture(self):
         with tempfile.TemporaryDirectory() as directory:
