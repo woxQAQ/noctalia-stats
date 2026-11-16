@@ -16,24 +16,20 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          collector = pkgs.rustPlatform.buildRustPackage {
-            pname = "noctalia-stats-collector";
-            version = "0.1.0";
-            src = pkgs.lib.fileset.toSource {
-              root = ./.;
-              fileset = pkgs.lib.fileset.unions [
-                ./Cargo.toml
-                ./Cargo.lock
-                ./collector
-              ];
-            };
-            cargoLock.lockFile = ./Cargo.lock;
+          collector = pkgs.writeShellApplication {
+            name = "noctalia-stats-collector";
+            runtimeInputs = [
+              pkgs.jq
+              pkgs.iproute2
+              pkgs.getconf
+            ];
+            text = builtins.readFile ./stats/bin/noctalia-stats-collector;
           };
           pluginSource = pkgs.lib.cleanSourceWith {
             src = ./stats;
             filter =
               path: type:
-              baseNameOf path != "bin" && baseNameOf path != "__pycache__" && !(pkgs.lib.hasSuffix ".pyc" path);
+              baseNameOf path != "__pycache__" && !(pkgs.lib.hasSuffix ".pyc" path);
           };
         in
         {
@@ -43,8 +39,7 @@
             cp -r ${pluginSource} $out/share/noctalia-stats/stats
             cp ${./catalog.toml} $out/share/noctalia-stats/catalog.toml
             chmod -R u+w $out/share/noctalia-stats
-            mkdir -p $out/share/noctalia-stats/stats/bin
-            cp ${collector}/bin/noctalia-stats-collector $out/share/noctalia-stats/stats/bin/
+            cp --remove-destination ${collector}/bin/noctalia-stats-collector $out/share/noctalia-stats/stats/bin/
           '';
         }
       );
@@ -61,10 +56,11 @@
               pkgs.python3
               pkgs.uv
               pkgs.just
-              pkgs.cargo
-              pkgs.rustc
-              pkgs.rustfmt
-              pkgs.clippy
+              pkgs.bash
+              pkgs.jq
+              pkgs.iproute2
+              pkgs.getconf
+              pkgs.shellcheck
             ];
           };
         }

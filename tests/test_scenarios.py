@@ -67,7 +67,8 @@ class PluginScenarios(unittest.TestCase):
             fields = ["0"] * 30
             fields[0] = "R"
             fields[11], fields[12], fields[19], fields[21] = "100", "25", "99999", "16"
-            (pid / "stat").write_text("42 (worker ) 中文 name) " + " ".join(fields))
+            name = 'worker ) 中文 " \\ name\nnext'
+            (pid / "stat").write_text(f"42 ({name}) " + " ".join(fields))
             (pid / "io").write_text("read_bytes: 4096\nwrite_bytes: 8192\n")
             (proc / "version").write_text("not a PID")
             (proc / "43").mkdir()  # A process that disappeared before stat was read.
@@ -79,27 +80,64 @@ class PluginScenarios(unittest.TestCase):
             self.assertEqual(snapshot["version"], 1)
             self.assertEqual(len(snapshot["processes"]), 1)
             row = snapshot["processes"][0]
-            self.assertEqual(row["name"], "worker ) 中文 name")
+            self.assertEqual(row["name"], name)
             self.assertEqual(row["start"], "99999")
             self.assertEqual(row["cpuSeconds"], 125 / os.sysconf("SC_CLK_TCK"))
             self.assertEqual(row["rssBytes"], 16 * os.sysconf("SC_PAGE_SIZE"))
             self.assertEqual(row["readBytes"], 4096)
             self.assertEqual(row["writeBytes"], 8192)
 
-    def test_network_collector_selects_one_usable_ipv6(self):
+    def test_network_collector_selects_one_usable_address(self):
+        addresses = [
+            {"family": "inet6", "scope": "global", "local": "2001:db8::2", "temporary": True},
+            {"family": "inet6", "scope": "global", "local": "2001:db8::1"},
+            {"family": "inet6", "scope": "global", "local": "2001:db8::3", "tentative": True},
+            {"family": "inet6", "scope": "global", "local": "2001:db8::4", "deprecated": True},
+            {"family": "inet6", "scope": "global", "local": "2001:db8::5", "dadfailed": True},
+            {"family": "inet6", "scope": "link", "local": "fe80::1"},
+            {"family": "inet", "scope": "link", "local": "169.254.1.1"},
+            {"family": "inet", "scope": "global", "local": "192.0.2.10"},
+            {"family": "inet", "scope": "global", "local": "192.0.2.2"},
+        ]
+        fixture = [
+            {"ifname": "fixture0", "addr_info": addresses},
+            {"ifname": "privacy0", "addr_info": addresses[:1]},
+            {"ifname": "lo", "addr_info": [
+                {"family": "inet", "scope": "host", "local": "127.0.0.1"},
+                {"family": "inet6", "scope": "host", "local": "::1"},
+            ]},
+        ]
         with tempfile.TemporaryDirectory() as directory:
-            proc = Path(directory)
-            (proc / "net").mkdir()
-            (proc / "net/if_inet6").write_text(
-                "20010db8000000000000000000000002 01 40 00 01 fixture0\n"
-                "20010db8000000000000000000000001 01 40 00 80 fixture0\n"
-                "20010db8000000000000000000000003 01 40 00 40 fixture0\n"
-                "fe800000000000000000000000000001 01 40 20 80 fixture0\n"
-            )
-            result = subprocess.run([str(COLLECTOR), "network", "--proc-root", str(proc)],
+            mock_ip = Path(directory) / "ip"
+            mock_ip.write_text('#!/bin/sh\n[ "$*" = "-j address show" ] || exit 2\nprintf \'%s\\n\' "$IP_FIXTURE"\n')
+            mock_ip.chmod(0o755)
+            environment = dict(os.environ, PATH=directory + os.pathsep + os.environ["PATH"],
+                               IP_FIXTURE=json.dumps(fixture))
+            result = subprocess.run([str(COLLECTOR), "network"], env=environment,
                                     capture_output=True, text=True, check=True, timeout=5)
             data = json.loads(result.stdout)
-            self.assertEqual(data["interfaces"]["fixture0"]["ipv6"], "2001:db8::1")
+            self.assertEqual(data["interfaces"]["fixture0"],
+                             {"ipv4": "192.0.2.2", "ipv6": "2001:db8::1"})
+            self.assertEqual(data["interfaces"]["privacy0"], {"ipv6": "2001:db8::2"})
+            self.assertNotIn("lo", data["interfaces"])
+
+    def test_collector_reports_invalid_invocations(self):
+        for arguments in ([], ["unknown"], ["processes", "--proc-root"],
+                          ["processes", "--unknown"]):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run([str(COLLECTOR), *arguments],
+                                        capture_output=True, text=True, timeout=5)
+                self.assertEqual(result.returncode, 2)
+                self.assertEqual(result.stdout, "")
+                self.assertIn("usage:", result.stderr)
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run([str(COLLECTOR), "processes", "--proc-root", directory],
+                                    capture_output=True, text=True, check=True, timeout=5)
+            self.assertEqual(json.loads(result.stdout)["processes"], [])
+            result = subprocess.run([str(COLLECTOR), "processes", "--proc-root", directory + "/missing"],
+                                    capture_output=True, text=True, timeout=5)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.stdout, "")
 
     def test_process_collector_live_protocol(self):
         result = subprocess.run(
@@ -115,6 +153,8 @@ class PluginScenarios(unittest.TestCase):
         for row in snapshot["processes"]:
             self.assertGreaterEqual(row["rssBytes"], 0)
             self.assertGreaterEqual(row["cpuSeconds"], 0)
+            self.assertNotIn("readBytes", row)
+            self.assertNotIn("writeBytes", row)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export LC_ALL=C
+
+usage() {
+    echo 'usage: noctalia-stats-collector <processes [--io] [--proc-root PATH]|network>' >&2
+    exit 2
+}
+
+mode=${1:-}
+[[ $# -gt 0 ]] || usage
+shift
+proc_root=/proc
+include_io=false
+while (($#)); do
+    case $1 in
+        --io) include_io=true; shift ;;
+        --proc-root) [[ $# -ge 2 ]] || usage; proc_root=$2; shift 2 ;;
+        *) usage ;;
+    esac
+done
+
+network() {
+    ip -j address show | jq -c '
+        def usable:
+            (.tentative // false | not) and
+            (.deprecated // false | not) and
+            (.dadfailed // false | not) and
+            (.valid_life_time != 0) and (.preferred_life_time != 0);
+        {
+            version: 1,
+            interfaces: (map(
+                .ifname as $name |
+                [.addr_info[] | select(usable)] as $addresses |
+                ([$addresses[] | select(.family == "inet") |
+                    select(.local | startswith("127.") or . == "0.0.0.0" | not)] |
+                    sort_by([(.local | startswith("169.254.")),
+                        (.local | split(".") | map(tonumber))]) | first) as $v4 |
+                ([$addresses[] | select(.family == "inet6" and .scope == "global") |
+                    select(.local != "::" and .local != "::1") ] |
+                    sort_by([(.temporary // false), .local]) | first) as $v6 |
+                {key: $name, value: ({} +
+                    (if $v4 then {ipv4: $v4.local} else {} end) +
+                    (if $v6 then {ipv6: $v6.local} else {} end))} |
+                select(.value != {})
+            ) | from_entries)
+        }'
+}
+
+process_records() {
+    local stat_file raw tail name pid key value rest read_bytes write_bytes
+    local denied=0 io_denied=0
+    local -a fields
+    for stat_file in "$proc_root"/[0-9]*/stat; do
+        [[ -e $stat_file ]] || continue
+        pid=${stat_file%/stat}
+        pid=${pid##*/}
+        [[ $pid =~ ^[0-9]+$ ]] || continue
+        if [[ ! -r $stat_file ]]; then
+            ((denied += 1))
+            continue
+        fi
+        # Read to EOF: Linux process names can contain newlines and parentheses.
+        raw=''
+        { IFS= read -r -d '' raw < "$stat_file"; } 2>/dev/null || true
+        [[ $raw == *'('*') '* ]] || continue
+        name=${raw#*\(}
+        name=${name%\)*}
+        tail=${raw##*\) }
+        tail=${tail//$'\n'/ }
+        read -r -a fields <<< "$tail"
+        ((${#fields[@]} >= 22)) || continue
+        [[ ${fields[11]} =~ ^[0-9]+$ && ${fields[12]} =~ ^[0-9]+$ &&
+           ${fields[19]} =~ ^[0-9]+$ && ${fields[21]} =~ ^-?[0-9]+$ ]] || continue
+        read_bytes='' write_bytes=''
+        if $include_io; then
+            if [[ -r ${stat_file%/stat}/io ]]; then
+                while read -r key value rest; do
+                    [[ $value =~ ^[0-9]+$ ]] || continue
+                    case $key in
+                        read_bytes:) read_bytes=$value ;;
+                        write_bytes:) write_bytes=$value ;;
+                    esac
+                done < "${stat_file%/stat}/io" 2>/dev/null || true
+            elif [[ -e ${stat_file%/stat}/io ]]; then
+                ((io_denied += 1))
+            fi
+        fi
+        printf '%s\0' "$pid" "$name" "${fields[19]}" "${fields[11]}" \
+            "${fields[12]}" "${fields[21]}" "$read_bytes" "$write_bytes"
+    done
+    local ended
+    read -r ended _ < /proc/uptime
+    printf '%s\0' "$denied" "$io_denied" "$ended"
+}
+
+case $mode in
+    processes)
+        [[ -d $proc_root && -r $proc_root && -x $proc_root ]] || {
+            echo "cannot read proc root: $proc_root" >&2
+            exit 1
+        }
+        read -r started _ < /proc/uptime
+        hz=$(getconf CLK_TCK)
+        pages=$(getconf PAGESIZE)
+        process_records | jq -Rsc --argjson sampledAt "$started" \
+            --argjson hz "$hz" --argjson pages "$pages" '
+            split("\u0000")[:-1] as $values |
+            ($values[:-3]) as $rows |
+            {
+                version: 1, sampledAt: $sampledAt,
+                scanMs: ([0, (($values[-1] | tonumber) - $sampledAt) * 1000] | max),
+                denied: ($values[-3] | tonumber),
+                ioDenied: ($values[-2] | tonumber),
+                processes: [range(0; $rows | length; 8) as $i |
+                    $rows[$i:$i+8] as $row |
+                    {pid: ($row[0] | tonumber), name: $row[1], start: $row[2],
+                     cpuSeconds: ((($row[3] | tonumber) + ($row[4] | tonumber)) / $hz),
+                     rssBytes: (([0, ($row[5] | tonumber)] | max) * $pages)} +
+                    (if $row[6] != "" then {readBytes: ($row[6] | tonumber)} else {} end) +
+                    (if $row[7] != "" then {writeBytes: ($row[7] | tonumber)} else {} end)
+                ]
+            }'
+        ;;
+    network) network ;;
+    *) usage ;;
+esac
