@@ -52,7 +52,13 @@ end
 local function publishProcesses()
 	local lease = noctalia.state.get("detail_lease")
 	local now = noctalia.nowMs()
-	if not lease or lease.expires < now or lease.expires > now + 10000 or lease.resource == "network" then
+	if
+		not lease
+		or lease.expires < now
+		or lease.expires > now + 10000
+		or lease.resource == "network"
+		or lease.resource == "gpu"
+	then
 		processBaseline = nil
 		lastProcesses = nil
 		noctalia.state.set("processes", { status = "inactive" })
@@ -135,6 +141,13 @@ local function publish(files, host)
 	cpu.freq = host.cpu and host.cpu.freqMhz
 	cpu.maxFreq = host.cpu and host.cpu.maxFreqMhz
 	cpu.load = host.loadAvg
+	local hostGpu = host.gpu or {}
+	local gpu = {
+		usage = hostGpu.usagePercent,
+		temp = hostGpu.tempC,
+		vramUsed = hostGpu.vramUsedBytes,
+		vramTotal = hostGpu.vramTotalBytes,
+	}
 	local memory = files.memory and proc.memory(files.memory) or { status = "error" }
 	local disks, diskCounters = {}, nil
 	if files.disks then
@@ -196,7 +209,8 @@ local function publish(files, host)
 	sequence += 1
 	remember("cpu", t, cpu.usage)
 	remember("memory", t, memory.usage)
-	local alive = { cpu = true, memory = true }
+	remember("gpu", t, gpu.usage)
+	local alive = { cpu = true, memory = true, gpu = true }
 	for _, row in ipairs(disks) do
 		local key = "disk:" .. row.id
 		alive[key] = true
@@ -219,6 +233,7 @@ local function publish(files, host)
 		sequence = sequence,
 		interval = interval,
 		cpu = cpu,
+		gpu = gpu,
 		memory = memory,
 		disk = disk,
 		network = net,
@@ -229,6 +244,7 @@ local function publish(files, host)
 		},
 	}
 	previous = { t = t, cpu = cpuCounters, disks = diskCounters, network = networkCounters }
+	noctalia.state.set("history_gpu", histories.gpu)
 	noctalia.state.set("history_cpu", histories.cpu)
 	noctalia.state.set("history_memory", histories.memory)
 	noctalia.state.set("history_disk", selectedDisk and histories["disk:" .. selectedDisk.id] or {})

@@ -14,7 +14,7 @@ local extraMemory = false
 local frameElapsed = 0
 local resource = "cpu"
 local opened = false
-local resources = { "cpu", "memory", "disk", "network" }
+local resources = { "cpu", "gpu", "memory", "disk", "network" }
 local addresses = {}
 local addressBusy = false
 local lastAddressRead = -math.huge
@@ -163,7 +163,7 @@ end
 
 local function history(compact)
 	local rows = noctalia.state.get("history_" .. resource) or {}
-	local percent = resource == "cpu" or resource == "memory"
+	local percent = resource == "cpu" or resource == "memory" or resource == "gpu"
 	local v1, v2, ceiling = f.graph(rows, percent)
 	local sample = noctalia.state.get("snapshot")
 	local identity = resource
@@ -393,6 +393,48 @@ local function cpuContent(sample)
 	return { summary, history(), coreBars(c.cores), ui.column({ gap = 4 }, details), processRows() }
 end
 
+local function gpuContent(sample)
+	local g = sample.gpu
+	local vramRatio
+	if g.vramUsed ~= nil and g.vramTotal and g.vramTotal > 0 then
+		vramRatio = g.vramUsed / g.vramTotal
+	end
+	return {
+		ui.row({ gap = 8, align = "center", paddingV = 2 }, {
+			gauge.render({
+				id = "gpu_temperature",
+				label = f.tr("temperature"),
+				size = 64,
+				text = g.temp and string.format("%.0f°C", g.temp) or "—",
+				value = g.temp and g.temp / 100,
+				tooltip = f.tr("temperature_scale"),
+			}),
+			gauge.render({
+				id = "gpu_usage",
+				label = f.tr("usage"),
+				size = 84,
+				text = f.percent(g.usage),
+				value = g.usage and g.usage / 100,
+			}),
+			gauge.render({
+				id = "gpu_vram",
+				label = f.tr("vram"),
+				size = 64,
+				text = f.percent(vramRatio and vramRatio * 100),
+				value = vramRatio,
+				color = "secondary",
+			}),
+		}),
+		history(),
+		ui.column({ gap = 4 }, {
+			section(f.tr("vram")),
+			metric(f.tr("used"), f.bytes(g.vramUsed)),
+			metric(f.tr("total"), f.bytes(g.vramTotal)),
+			note(f.tr("gpu_hint")),
+		}),
+	}
+end
+
 local function memoryContent(sample)
 	local m = sample.memory
 	local psi = sample.pressure.memory
@@ -620,7 +662,8 @@ local function networkContent(sample)
 	return rows
 end
 
-local content = { cpu = cpuContent, memory = memoryContent, disk = diskContent, network = networkContent }
+local content =
+	{ cpu = cpuContent, gpu = gpuContent, memory = memoryContent, disk = diskContent, network = networkContent }
 
 render = function()
 	if not opened then

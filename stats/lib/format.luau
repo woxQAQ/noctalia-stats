@@ -60,7 +60,8 @@ function M.graph(rows, percent)
 	return values, values2, ceiling
 end
 
-M.glyphs = { cpu = "cpu-usage", memory = "memory", disk = "storage", network = "arrows-transfer-up-down" }
+M.glyphs =
+	{ cpu = "cpu-usage", gpu = "gpu-usage", memory = "memory", disk = "storage", network = "arrows-transfer-up-down" }
 
 function M.summary(resource, sample, metric)
 	if not M.fresh(sample) then
@@ -68,6 +69,9 @@ function M.summary(resource, sample, metric)
 	end
 	if resource == "cpu" then
 		return M.percent(sample.cpu.usage), M.tr("cpu")
+	end
+	if resource == "gpu" then
+		return M.percent(sample.gpu.usage), M.tr("gpu")
 	end
 	if resource == "memory" then
 		return M.percent(sample.memory.usage), M.bytes(sample.memory.used) .. " / " .. M.bytes(sample.memory.total)

@@ -28,9 +28,9 @@ function M.mount(resource, options)
 			lastIdentity = identity
 		end
 		local rows = fresh and noctalia.state.get("history_" .. resource) or {}
-		local v1, v2 = f.graph(rows or {}, resource == "cpu" or resource == "memory")
+		local v1, v2 = f.graph(rows or {}, resource == "cpu" or resource == "memory" or resource == "gpu")
 		local ratio, segments
-		if fresh and (resource == "cpu" or resource == "memory") then
+		if fresh and (resource == "cpu" or resource == "memory" or resource == "gpu") then
 			ratio = sample[resource].usage and sample[resource].usage / 100
 		end
 		if capacity and capacity.totalBytes > 0 then

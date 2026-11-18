@@ -137,6 +137,18 @@ entry = "cpu.luau"
   options = [{ value = "value", label_key = "display.value" }, { value = "mini", label_key = "display.mini" }, { value = "graph", label_key = "display.graph" }, { value = "line", label_key = "display.line" }, { value = "both", label_key = "display.both" }, { value = "bars", label_key = "display.bars" }, { value = "ring", label_key = "display.ring" }, { value = "pie", label_key = "display.pie" }, { value = "gauge", label_key = "display.gauge" }]
 
 [[widget]]
+id = "gpu"
+entry = "gpu.luau"
+  [widget.actions]
+  right = "settings-open-widget"
+  [[widget.setting]]
+  key = "display"
+  type = "select"
+  label_key = "settings.display"
+  default = "both"
+  options = [{ value = "value", label_key = "display.value" }, { value = "mini", label_key = "display.mini" }, { value = "graph", label_key = "display.graph" }, { value = "line", label_key = "display.line" }, { value = "both", label_key = "display.both" }, { value = "bars", label_key = "display.bars" }, { value = "ring", label_key = "display.ring" }, { value = "pie", label_key = "display.pie" }, { value = "gauge", label_key = "display.gauge" }]
+
+[[widget]]
 id = "memory"
 entry = "memory.luau"
   [widget.actions]

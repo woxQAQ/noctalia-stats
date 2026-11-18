@@ -1,6 +1,8 @@
 # Noctalia Stats
 
-Noctalia 的资源监控插件，提供 CPU、内存、磁盘、网络详情和 Magpie 用量统计。
+Noctalia 的资源监控插件，提供 CPU、GPU、内存、磁盘、网络详情和 Magpie 用量统计。
+
+GPU 小组件显示使用率，点击可查看历史曲线、温度和显存。数据来自 Noctalia 系统监控，刷新频率由其 `gpu_poll_seconds` 设置控制；未提供的指标显示为“—”，集成显卡可能没有独立显存。
 
 Collector 是随插件分发的 Bash 脚本，无需编译。运行依赖为 Bash、jq、iproute2 和提供 `getconf` 的 libc 工具。进程数据直接读取 `/proc`，网卡地址通过 `ip -j address show` 获取。
 

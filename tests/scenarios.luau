@@ -18,6 +18,7 @@ local palette = {
 	on_surface_variant = "#666666",
 }
 local maxFrequency = 4000
+local gpuStats = { usagePercent = 40, tempC = 55, vramUsedBytes = 1073741824, vramTotalBytes = 4294967296 }
 local files = {}
 local envs = {}
 local configs = {
@@ -96,7 +97,11 @@ local function vm(path, vertical)
 		end,
 		systemStats = function()
 			return monitor
-					and { cpu = { tempC = 50, freqMhz = 3200, maxFreqMhz = maxFrequency }, loadAvg = { 1, 2, 3 } }
+					and {
+						cpu = { tempC = 50, freqMhz = 3200, maxFreqMhz = maxFrequency },
+						gpu = copy(gpuStats),
+						loadAvg = { 1, 2, 3 },
+					}
 				or nil
 		end,
 		diskMounts = function()
@@ -385,7 +390,7 @@ local function collectTexts(node, values)
 	end
 	return values
 end
-for _, name in ipairs({ "cpu", "memory", "disk", "network" }) do
+for _, name in ipairs({ "cpu", "gpu", "memory", "disk", "network" }) do
 	panelEntry.onClose()
 	local widget = vm(name .. ".luau")
 	widget.onClick()
@@ -394,6 +399,17 @@ for _, name in ipairs({ "cpu", "memory", "disk", "network" }) do
 	assert(state.selected_resource == name)
 	assert(state.detail_lease.resource == name, "opening a resource renews the matching collector demand")
 	assert(rendered["panel.luau"].kind == "column")
+	if name == "gpu" then
+		assert(string.find(gaugeSvg("gpu_usage"), ">40.0%</text>", 1, true))
+		assert(string.find(gaugeSvg("gpu_vram"), ">25.0%</text>", 1, true))
+		assert(string.find(gaugeSvg("gpu_temperature"), ">55°C</text>", 1, true))
+		local launches = processLaunches
+		observation(2)
+		service.update()
+		assert(processLaunches == launches, "GPU details must not scan CPU processes")
+		assert(state.processes.status == "inactive")
+		assert(state.snapshot.gpu.usage == 40 and #state.history_gpu > 0)
+	end
 	if name == "network" then
 		local text = collectTexts(rendered["panel.luau"])
 		assert(text["192.168.1.2"] and text["198.51.100.8"], "local and public IP are distinct fields")
@@ -522,7 +538,7 @@ for path in pairs(imageFiles) do
 	assert(not string.match(path, "%.tmp$"), "atomic writes leave no temporary files")
 	imageCount += 1
 end
-assert(imageCount <= 10, "five popup gauges use at most two files each")
+assert(imageCount <= 16, "eight popup gauges use at most two files each")
 
 configs.interface = "eth0"
 configs.disk_device = ""
@@ -552,6 +568,29 @@ for name, styles in pairs(STYLES) do
 		end
 	end
 end
+
+-- Missing GPU probes clear the usage history without inventing idle samples.
+panelEntry.onClose()
+state.selected_resource = "gpu"
+panelEntry.onOpen()
+gpuStats = { tempC = 60 }
+observation(80)
+selectedService.update()
+assert(state.snapshot.gpu.usage == nil and #state.history_gpu == 0)
+assert(string.find(gaugeSvg("gpu_temperature"), ">60°C</text>", 1, true))
+assert(not string.find(gaugeSvg("gpu_usage"), "stroke-dasharray", 1, true))
+assert(not string.find(gaugeSvg("gpu_vram"), "stroke-dasharray", 1, true))
+gpuStats = nil
+observation(81)
+selectedService.update()
+assert(state.snapshot.status == "ready" and #state.history_gpu == 0)
+gpuStats = { usagePercent = 0, tempC = 0, vramUsedBytes = 0, vramTotalBytes = 0 }
+observation(82)
+selectedService.update()
+assert(state.snapshot.gpu.usage == 0 and #state.history_gpu == 1)
+assert(string.find(gaugeSvg("gpu_usage"), ">0.0%</text>", 1, true))
+assert(not string.find(gaugeSvg("gpu_vram"), "stroke-dasharray", 1, true))
+panelEntry.onClose()
 
 print(
 	"PASS: service, multi-widget, panel, counters, PID reuse, leases, disabled monitor, read failure, missing dependency, suspend, collector failure, device removal, bounded history, explicit selection"
